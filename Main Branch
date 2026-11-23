@@ -1,0 +1,307 @@
+```html
+<!DOCTYPE html>
+<html lang="de" class="dark h-full select-none">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>AETHER – Spatial 3D Device File Manager</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#030305',
+                        code: '#38bdf8',
+                        docs: '#10b981',
+                        design: '#f472b6',
+                        notes: '#fbbf24',
+                        archive: '#a78bfa',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts & Three.js -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        /* Touch & Mobile UX Optimizations */
+        * {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #030305;
+        }
+
+        /* Glassmorphism Styles for Mobile UI */
+        .glass-card {
+            background: rgba(12, 16, 26, 0.78);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75);
+        }
+
+        .glass-pill {
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+        }
+
+        .glass-pill-active {
+            background: rgba(56, 189, 248, 0.22);
+            border: 1px solid rgba(56, 189, 248, 0.5);
+            box-shadow: 0 0 18px rgba(56, 189, 248, 0.3);
+        }
+
+        .bottom-sheet {
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #webgl-canvas {
+            touch-action: none;
+        }
+
+        /* Custom Scrollbar for Drawer */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.25);
+            border-radius: 4px;
+        }
+
+        /* Pulse Animations for FAB */
+        @keyframes fab-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(56, 189, 248, 0.4), 0 0 30px rgba(56, 189, 248, 0.2); }
+            50% { box-shadow: 0 0 25px rgba(56, 189, 248, 0.85), 0 0 50px rgba(56, 189, 248, 0.45); }
+        }
+        .animate-fab-glow {
+            animation: fab-glow 3s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="text-slate-100 font-sans antialiased overflow-hidden select-none">
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container" class="absolute inset-0 z-0">
+        <canvas id="webgl-canvas" class="w-full h-full block"></canvas>
+    </div>
+
+    <!-- INITIAL ONBOARDING OVERLAY (Loads Real Device Files) -->
+    <div id="welcome-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md transition-opacity duration-300">
+        <div class="glass-card max-w-sm w-full p-6 rounded-3xl text-center flex flex-col gap-4 border border-cyan-500/30">
+            <div class="w-16 h-16 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto border border-cyan-500/40">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+            </div>
+            
+            <div>
+                <h2 class="text-xl font-bold text-white tracking-wide">AETHER 3D FILE MANAGER</h2>
+                <p class="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                    Visualisiere deine <strong>echten Smartphone-Ordner</strong> als interaktive 3D-Galaxie & neuronales Wissensnetz.
+                </p>
+            </div>
+
+            <div class="flex flex-col gap-2.5 pt-2">
+                <!-- Select Entire Folder -->
+                <button onclick="triggerPicker('main-folder-input')" class="py-3.5 px-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all">
+                    <svg class="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                    <span>Ganzen Ordner importieren</span>
+                </button>
+                
+                <!-- Select Multiple Files -->
+                <button onclick="triggerPicker('main-file-input')" class="py-3 px-4 rounded-2xl glass-pill text-cyan-300 font-semibold text-xs border border-cyan-500/40 active:scale-95 transition-all">
+                    Mehrere Dateien auswählen
+                </button>
+
+                <!-- Demo Files Option -->
+                <button onclick="startWithDemoFiles()" class="py-2.5 px-4 rounded-2xl text-slate-400 font-mono text-[11px] hover:text-slate-200">
+                    Oder Demo-Universum testen →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Native Inputs for Real Android Picker -->
+    <input type="file" id="main-folder-input" webkitdirectory directory multiple class="hidden" onchange="handleRealFilesImport(event)">
+    <input type="file" id="main-file-input" multiple class="hidden" onchange="handleRealFilesImport(event)">
+
+    <!-- MAIN UI OVERLAY -->
+    <div id="ui-layer" class="relative z-10 w-full h-full pointer-events-none flex flex-col justify-between p-3 sm:p-4 pb-safe transition-opacity duration-300">
+        
+        <!-- TOP BAR (Minimalist Android Header) -->
+        <header class="flex flex-col gap-2 pointer-events-auto max-w-lg mx-auto w-full">
+            <div class="flex items-center justify-between glass-card px-4 py-2.5 rounded-2xl">
+                <!-- App Brand -->
+                <div class="flex items-center gap-2.5">
+                    <div class="relative flex h-3 w-3">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-500"></span>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-xs tracking-widest text-white leading-none">AETHER</h1>
+                        <span id="active-folder-label" class="text-[10px] text-cyan-400 font-mono tracking-wider truncate block max-w-[130px]">Echte Dateien</span>
+                    </div>
+                </div>
+
+                <!-- Stats & Clean View Toggle -->
+                <div class="flex items-center gap-2">
+                    <div class="glass-pill px-2.5 py-1 rounded-xl text-[11px] font-mono text-slate-300 flex items-center gap-1.5">
+                        <span class="text-slate-400">Dateien:</span>
+                        <strong id="stat-node-count" class="text-cyan-400">0</strong>
+                    </div>
+                    
+                    <button onclick="toggleCleanView()" class="p-2 rounded-xl glass-pill text-slate-300 hover:text-white active:scale-95 transition-transform" title="Clean View">
+                        <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Horizontal Category Filter Pills -->
+            <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 text-xs">
+                <button onclick="filterCategory('all')" class="cat-pill active-pill glass-pill glass-pill-active shrink-0 px-3 py-1.5 rounded-xl font-medium text-white transition-all" data-cat="all">Alle</button>
+                <button onclick="filterCategory('code')" class="cat-pill glass-pill shrink-0 px-3 py-1.5 rounded-xl font-medium text-slate-300 transition-all" data-cat="code">Code</button>
+                <button onclick="filterCategory('docs')" class="cat-pill glass-pill shrink-0 px-3 py-1.5 rounded-xl font-medium text-slate-300 transition-all" data-cat="docs">Dokumente</button>
+                <button onclick="filterCategory('design')" class="cat-pill glass-pill shrink-0 px-3 py-1.5 rounded-xl font-medium text-slate-300 transition-all" data-cat="design">Medien</button>
+                <button onclick="filterCategory('notes')" class="cat-pill glass-pill shrink-0 px-3 py-1.5 rounded-xl font-medium text-slate-300 transition-all" data-cat="notes">Notizen</button>
+                <button onclick="filterCategory('archive')" class="cat-pill glass-pill shrink-0 px-3 py-1.5 rounded-xl font-medium text-slate-300 transition-all" data-cat="archive">Sonstige</button>
+            </div>
+        </header>
+
+        <!-- FLOATING TOUCH TOOLTIP -->
+        <div id="mobile-tooltip" class="absolute pointer-events-none opacity-0 transition-opacity duration-200 z-20 left-1/2 top-1/3 transform -translate-x-1/2 -translate-y-1/2">
+            <div class="glass-card px-3.5 py-2 rounded-2xl text-xs flex items-center gap-2 border border-cyan-500/40 shadow-2xl">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                <span id="tooltip-text" class="font-medium text-white font-mono">Datei ausgewählt</span>
+            </div>
+        </div>
+
+        <!-- BOTTOM DOCK (Thumb Zone Navigation) -->
+        <footer class="pointer-events-auto max-w-lg mx-auto w-full flex flex-col gap-2 mb-1">
+            
+            <!-- Real Device Timeline Slider -->
+            <div id="timeline-box" class="glass-card px-3.5 py-2.5 rounded-2xl hidden flex-col gap-1 transition-all">
+                <div class="flex justify-between items-center text-[11px] font-mono">
+                    <span class="text-slate-400">Zeitreise (Änderungsdatum):</span>
+                    <span id="timeline-label" class="text-cyan-300 font-bold">Alle Daten</span>
+                </div>
+                <input type="range" id="timeline-slider" min="0" max="100" value="100" class="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer" oninput="handleTimelineChange(this.value)">
+            </div>
+
+            <!-- Main Thumb Bar -->
+            <div class="glass-card p-2 rounded-3xl flex items-center justify-between gap-1 shadow-2xl">
+                
+                <!-- Left: Mode Switcher -->
+                <div class="flex p-0.5 bg-slate-900/60 rounded-2xl border border-white/5">
+                    <button id="btn-mode-galaxy" onclick="switchMode('galaxy')" class="px-3 py-2 rounded-xl text-xs font-semibold text-white bg-white/10 flex items-center gap-1.5 transition-all active:scale-95">
+                        <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                        <span>Galaxie</span>
+                    </button>
+                    <button id="btn-mode-brain" onclick="switchMode('brain')" class="px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 flex items-center gap-1.5 transition-all active:scale-95">
+                        <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        <span>Gehirn</span>
+                    </button>
+                </div>
+
+                <!-- Center FAB (+) -->
+                <button onclick="openUploadBottomSheet()" class="w-12 h-12 rounded-full bg-gradient-to-tr from-cyan-500 to-emerald-400 text-slate-950 flex items-center justify-center font-bold text-xl shadow-lg cursor-pointer active:scale-90 transition-transform animate-fab-glow shrink-0" title="Ordner oder Dateien laden">
+                    <svg class="w-6 h-6 text-slate-950 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                </button>
+
+                <!-- Right Tools -->
+                <div class="flex items-center gap-1">
+                    <button onclick="openSearchBottomSheet()" class="p-2.5 rounded-2xl glass-pill text-slate-300 hover:text-white active:scale-95 transition-all" title="Suche">
+                        <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </button>
+                    <button onclick="toggleTimelineUI()" class="p-2.5 rounded-2xl glass-pill text-slate-300 hover:text-white active:scale-95 transition-all" title="Zeitreise">
+                        <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </button>
+                </div>
+
+            </div>
+        </footer>
+    </div>
+
+    <!-- RESTORE HUD BUTTON -->
+    <button id="btn-restore-hud" onclick="toggleCleanView()" class="fixed top-4 right-4 z-50 glass-card px-4 py-2 rounded-2xl text-xs font-semibold text-cyan-300 hidden pointer-events-auto active:scale-95 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+        <span>UI einblenden</span>
+    </button>
+
+    <!-- ANDROID BOTTOM SHEET DRAWER -->
+    <div id="bottom-sheet-overlay" onclick="closeBottomSheet()" class="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300"></div>
+
+    <div id="bottom-sheet" class="bottom-sheet fixed bottom-0 left-0 right-0 z-40 max-w-lg mx-auto glass-card rounded-t-3xl p-5 pb-safe transform translate-y-full flex flex-col max-h-[85vh] pointer-events-auto border-t border-white/20">
+        
+        <!-- Drag Handle Pill -->
+        <div class="w-12 h-1.5 bg-slate-600/80 rounded-full mx-auto mb-4 shrink-0"></div>
+
+        <!-- CONTENT MODE 1: REAL FILE INSPECTOR -->
+        <div id="sheet-content-file" class="flex flex-col h-full overflow-hidden">
+            <!-- Header -->
+            <div class="flex items-start justify-between gap-3 pb-3 border-b border-slate-800 shrink-0">
+                <div class="overflow-hidden">
+                    <div class="flex items-center gap-2 mb-1 flex-wrap">
+                        <span id="sheet-file-badge" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">CODE</span>
+                        <span id="sheet-file-date" class="text-xs text-slate-400 font-mono">2026-11-23</span>
+                        <span id="sheet-file-size" class="text-xs text-slate-400 font-mono">· 45 KB</span>
+                    </div>
+                    <h2 id="sheet-file-title" class="text-base font-bold text-white truncate">Dateiname.ext</h2>
+                    <p id="sheet-file-path" class="text-[11px] text-slate-400 font-mono truncate">/Pfad/zur/Datei</p>
+                </div>
+                <button onclick="closeBottomSheet()" class="p-1.5 rounded-full glass-pill text-slate-400 hover:text-white shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Scrollable Body for Real Preview -->
+            <div class="overflow-y-auto py-3 flex flex-col gap-3 pr-1">
+                
+                <!-- Live Image Preview Container -->
+                <div id="sheet-image-container" class="hidden rounded-2xl overflow-hidden border border-white/15 bg-black/40 max-h-56 flex items-center justify-center p-1">
+                    <img id="sheet-file-image" src="" alt="Vorschau" class="max-h-52 w-auto object-contain rounded-xl">
+                </div>
+
+                <!-- Text & Code Preview -->
+                <div id="sheet-text-container">
+                    <label class="text-[10px] font-mono uppercase tracking-wider text-slate-400 block mb-1">Echter Dateiinhalt / Notiz</label>
+                    <textarea id="sheet-file-content" class="w-full h-32 glass-pill rounded-2xl p-3 text-xs font-mono text-slate-200 border border-white/10 focus:outline-none focus:border-cyan-500/50 resize-none leading-relaxed" placeholder="Lade Inhalt..."></textarea>
+                </div>
+
+                <!-- Binary Blob Action -->
+                <div id="sheet-blob-action" class="hidden">
+                    <a id="sheet-blob-link" href="#" target="_blank" download class="py-2.5 px-4 rounded-xl glass-pill text-xs font-mono text-cyan-300 flex items-center justify-center gap-2 border border-cyan-500/30">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        <span>Datei öffnen / herunterladen</span>
+                    </a>
+                </div>
+
+                <!-- Synapse Links -->
+                <div>
+                    <label class="text-[10px] font-mono uppercase tracking-wider text-slate-400 block mb-1.5">Synapsen-Verbindungen (Ordner & Tags)</label>
+                    <div id="sheet-file-links" class="flex flex-wrap gap-1.5">
+                        <!-- Chips inserted dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Android Actions Footer -->
+            <div class="grid grid-cols-3 ga
